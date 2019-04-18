@@ -1,0 +1,3 @@
+[submodule "themes/ad"]
+	path = themes/ad
+	url = https://github.com/dongyuanxin/theme-ad.git
