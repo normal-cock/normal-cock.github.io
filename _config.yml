@@ -82,5 +82,5 @@ theme: ad
 deploy:
   type: git
   repo: https://github.com/zhiyajun11/zhiyajun11.github.io.git
-  branch: published
+  branch: master
   message: 
