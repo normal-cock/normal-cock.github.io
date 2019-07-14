@@ -1,3 +1,6 @@
 [submodule "themes/ad"]
 	path = themes/ad
-	url = https://github.com/dongyuanxin/theme-ad.git
+	url = https://github.com/normal-cock/theme-ad.git
+[submodule "themes/bmw"]
+	path = themes/bmw
+	url = https://github.com/dongyuanxin/theme-bmw.git
