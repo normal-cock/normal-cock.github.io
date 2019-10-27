@@ -182,12 +182,15 @@
   </h1>
   
   <article class="passage-article">
-    <h2 id="1-写在开头"><a href="#1-写在开头" class="headerlink" title="1. 写在开头"></a>1. 写在开头</h2><p>最近在爬长城（GFW）的时候，顺带研究了一下用到的一些网络组件的代码，将很久不用的网络知识重新梳理了一遍，收益良多。突然想起马云之前说的一句话：他们搞双十一不是为了赚钱，而是为了磨炼团队的技术实力。我想，大大们建长城的目的大概也是如此。想到这里，不禁一股暖意涌上心头。<br>于是，想到了写这个专题——Http Server漫游。</p>
-<h2 id="2-为什么写这个专题呢？"><a href="#2-为什么写这个专题呢？" class="headerlink" title="2. 为什么写这个专题呢？"></a>2. 为什么写这个专题呢？</h2><p>一方面想借着这个机会将这段时间的学习成果沉淀下来，另一方面也想通过分享，查缺补漏。<br>当然，如果恰巧你阅读了部分内容，又恰巧这些内容帮助到你，那兄弟我深感荣幸。另外，由于水平有限，如果出现不正确的地方还请不吝赐教。</p>
+    <h2 id="1-写在开头"><a href="#1-写在开头" class="headerlink" title="1. 写在开头"></a>1. 写在开头</h2><p>最近在爬长城（GFW）的时候，顺带研究了一下用到的一些网络组件的代码，将很久不用的网络知识重新梳理了一遍，收益良多。突然想起马云之前说的一句话：他们搞双十一不是为了赚钱，而是为了磨炼团队的技术实力。我想，大大们建长城的目的大概也是如此。想到这里，不禁一股暖意涌上心头。</p>
+<p>于是，想到了写这个专题——Http Server漫游。</p>
+<h2 id="2-为什么写这个专题呢？"><a href="#2-为什么写这个专题呢？" class="headerlink" title="2. 为什么写这个专题呢？"></a>2. 为什么写这个专题呢？</h2><p>一方面想借着这个机会将这段时间的学习成果沉淀下来，另一方面也想通过分享，查缺补漏。</p>
+<p>当然，如果恰巧你阅读了部分内容，又恰巧这些内容帮助到你，那兄弟我深感荣幸。另外，由于水平有限，如果出现不正确的地方还请不吝赐教。</p>
 <h2 id="3-这个专题会包含哪些内容呢？"><a href="#3-这个专题会包含哪些内容呢？" class="headerlink" title="3. 这个专题会包含哪些内容呢？"></a>3. 这个专题会包含哪些内容呢？</h2><p>主要是一些跟Http Server相关的一些知识，大到网络通讯的原理、网络模型、协程等，小到某个开源服务器的实现都会涉及。</p>
 <h2 id="4-正篇"><a href="#4-正篇" class="headerlink" title="4. 正篇"></a>4. 正篇</h2><p>作为这个专题的第一篇，我想说说之前一直困扰我很久的一个问题“阻塞、非阻塞、同步、异步”。</p>
 <p>关于“阻塞、非阻塞、同步、异步”的区别，网上众说纷纭，其中很大一部分人喜欢用一个生活中的比喻来解释。但我认为，比喻虽然生动形象，但是毕竟与计算机技术的实际场景有所不同，导致很多人在阅读的过程中看懂了例子，却还是弄不明白“阻塞、非阻塞、同步、异步”。因此本文中我将不在使用比喻，而是列举“阻塞、非阻塞、同步、异步”相关的例子来解释说明。</p>
-<h3 id="4-1-字面意思解释"><a href="#4-1-字面意思解释" class="headerlink" title="4.1. 字面意思解释"></a>4.1. 字面意思解释</h3><p>好，要开始了，接下来的内容请仔细阅读。<br>首先，我们先来看看这四个词语本身的含义。先来看一张表：</p>
+<h3 id="4-1-字面意思解释"><a href="#4-1-字面意思解释" class="headerlink" title="4.1. 字面意思解释"></a>4.1. 字面意思解释</h3><p>好，要开始了，接下来的内容请仔细阅读。</p>
+<p>首先，我们先来看看这四个词语本身的含义。先来看一张表：</p>
 <table>
 <thead>
 <tr>
@@ -220,21 +223,27 @@
 </tbody>
 </table>
 <p>从这张表我们可以看出，阻塞与非阻塞描述的主语是一样的，同步和异步描述的主语是一样的。所以，可以得出第一个结论，<strong>本质上“阻塞和非阻塞”与“同步和异步”之间并没有必然的关系</strong>。</p>
-<h3 id="4-2-对应的编程技术"><a href="#4-2-对应的编程技术" class="headerlink" title="4.2. 对应的编程技术"></a>4.2. 对应的编程技术</h3><p>接下来，我们来聊聊“阻塞、非阻塞、同步、异步”在我们的计算机编程中所代表的东西。<br>先说结论：</p>
+<h3 id="4-2-对应的编程技术"><a href="#4-2-对应的编程技术" class="headerlink" title="4.2. 对应的编程技术"></a>4.2. 对应的编程技术</h3><p>接下来，我们来聊聊“阻塞、非阻塞、同步、异步”在我们的计算机编程中所代表的东西。</p>
+<p>先说结论：</p>
 <ul>
 <li>结论1：阻塞和非阻塞代表是否为打开的文件描述符设置了<code>O_NONBLOCK属性</code>。</li>
 <li>结论2：同步和异步是指在对文件描述符进行IO操作时，是否使用了<code>epoll</code>等多路复用技术或者<code>AIO</code>。</li>
 </ul>
 <p>如果不清楚我在说什么，建议看看网络编程相关的知识。如果看懂了之前描述“阻塞、非阻塞、同步、异步”的那张表格，也知道<code>O_NONBLOCK属性</code>, <code>多路复用</code>, <code>AIO</code>，但还是对我说的两条结论不太理解的话，也别着急，听我解释。</p>
-<h4 id="4-2-1-结论1"><a href="#4-2-1-结论1" class="headerlink" title="4.2.1. 结论1"></a>4.2.1. 结论1</h4><p>先说说<strong>结论1</strong>。<br>首先我们知道阻塞和非阻塞的主语是调用者，而文件描述符的调用者或者说操作者是打开和操作文件描述符的程序，因此此处<code>O_NONBLOCK</code>描述的便是操作文件描述符的程序的状态。</p>
+<h4 id="4-2-1-结论1"><a href="#4-2-1-结论1" class="headerlink" title="4.2.1. 结论1"></a>4.2.1. 结论1</h4><p>先说说<strong>结论1</strong>。</p>
+<p>首先我们知道阻塞和非阻塞的主语是调用者，而文件描述符的调用者或者说操作者是打开和操作文件描述符的程序，因此此处<code>O_NONBLOCK</code>描述的便是操作文件描述符的程序的状态。</p>
 <p>举个栗子，假设发生了如下事件：</p>
 <ol>
 <li><code>程序A</code>打开了网络<code>连接C</code>，默认情况下<code>C</code>的描述符的属性为阻塞模式，此处使用默认的阻塞模式</li>
 <li><code>程序A</code>试图在没有数据到来的情况下从<code>C</code>中读取数据。</li>
 <li>有数据到达<code>C</code>。</li>
 </ol>
-<p>在默认阻塞模式下，第2步时<code>程序A</code>便会卡住，直到读到数据或者读取超时。而如果我们为<code>C</code>的文件描述符设置了<code>O_NONBLOCK</code>模式，则第2步时，<code>程序A</code>不会被卡住，而是通过<code>read</code>的返回值被告知当前没有可以读取的数据。<code>程序A</code>拿到了这个告知后便可以选择是继续等待，还是去执行其他的任务了，而不会被一直卡住。<br>这就是“阻塞和非阻塞”在编程时对应的东西。</p>
-<h4 id="4-2-2-结论2"><a href="#4-2-2-结论2" class="headerlink" title="4.2.2. 结论2"></a>4.2.2. 结论2</h4><p>接下来我们说说<strong>结论2</strong>。<br>还是先说说这两个词本身，“同步和异步”这两个词所描述的是两个主体之间的合作模式，而针对文件描述符的操作来说，这两个主体便是指操作文件描述符的程序和文件描述符所代表的资源管理者。<br>接着用上面的例子，“同步和异步”所描述便是两个主体——<code>程序A</code>和<code>连接C</code>——之间的合作模式。在同步模式下，<code>程序A</code>的行为和<code>连接C</code>的行为是串行进行的，即在步骤2时，<code>程序A</code>调用<code>read</code>接口去读取数，此时控制权交给了<code>连接C</code>，<code>连接C</code>根据是否有数据以及是否使用了<code>O_NONBLOCK</code>来决定什么时候将控制权交给<code>程序A</code>。无论何种情况，只要<code>C</code>不将控制权交给<code>A</code>，<code>A</code>便无法处理其他事情，所以说两者是串行执行的。<br>而如果使用了epoll或AIO，则两者的合作模式将会发生改变，即<code>程序A</code>只有在收到<code>连接C</code>的通知时，才会去读取或写入<code>C</code>，而在没有通知时，<code>程序A</code>可以去处理其他的事情或其他消息，因此两者之间是并行的。</p>
+<p>在默认阻塞模式下，第2步时<code>程序A</code>便会卡住，直到读到数据或者读取超时。而如果我们为<code>C</code>的文件描述符设置了<code>O_NONBLOCK</code>模式，则第2步时，<code>程序A</code>不会被卡住，而是通过<code>read</code>的返回值被告知当前没有可以读取的数据。<code>程序A</code>拿到了这个告知后便可以选择是继续等待，还是去执行其他的任务了，而不会被一直卡住。</p>
+<p>这就是“阻塞和非阻塞”在编程时对应的东西。</p>
+<h4 id="4-2-2-结论2"><a href="#4-2-2-结论2" class="headerlink" title="4.2.2. 结论2"></a>4.2.2. 结论2</h4><p>接下来我们说说<strong>结论2</strong>。</p>
+<p>还是先说说这两个词本身，“同步和异步”这两个词所描述的是两个主体之间的合作模式，而针对文件描述符的操作来说，这两个主体便是指操作文件描述符的程序和文件描述符所代表的资源管理者。</p>
+<p>接着用上面的例子，“同步和异步”所描述便是两个主体——<code>程序A</code>和<code>连接C</code>——之间的合作模式。在同步模式下，<code>程序A</code>的行为和<code>连接C</code>的行为是串行进行的，即在步骤2时，<code>程序A</code>调用<code>read</code>接口去读取数，此时控制权交给了<code>连接C</code>，<code>连接C</code>根据是否有数据以及是否使用了<code>O_NONBLOCK</code>来决定什么时候将控制权交给<code>程序A</code>。无论何种情况，只要<code>C</code>不将控制权交给<code>A</code>，<code>A</code>便无法处理其他事情，所以说两者是串行执行的。</p>
+<p>而如果使用了epoll或AIO，则两者的合作模式将会发生改变，即<code>程序A</code>只有在收到<code>连接C</code>的通知时，才会去读取或写入<code>C</code>，而在没有通知时，<code>程序A</code>可以去处理其他的事情或其他消息，因此两者之间是并行的。</p>
 <h4 id="4-2-3-非阻塞与异步的“特殊”关系"><a href="#4-2-3-非阻塞与异步的“特殊”关系" class="headerlink" title="4.2.3. 非阻塞与异步的“特殊”关系"></a>4.2.3. 非阻塞与异步的“特殊”关系</h4><p>但是有一点要注意，虽说“阻塞和非阻塞”与“同步和异步”之间并没有必然的关系，但在使用时，部分的异步处理方式需要使用非阻塞模式来支撑。具体关系为：</p>
 <ul>
 <li><strong>使用<code>epoll</code>时，分两种情况</strong>（如果不了解，请参考unix网络编程）.<ol>
@@ -244,11 +253,11 @@
 </li>
 <li><strong>使用<code>aio</code>时，阻塞和非阻塞IO都可以。</strong></li>
 </ul>
-<h3 id="4-3-epoll和AIO的区别"><a href="#4-3-epoll和AIO的区别" class="headerlink" title="4.3. epoll和AIO的区别"></a>4.3. epoll和AIO的区别</h3><p>最后，在简单说一下epoll和AIO的区别：</p>
+<h3 id="4-3-Epoll和AIO的区别"><a href="#4-3-Epoll和AIO的区别" class="headerlink" title="4.3. Epoll和AIO的区别"></a>4.3. Epoll和AIO的区别</h3><p>最后，在简单说一下Epoll和AIO的区别：</p>
 <ul>
-<li><strong>通知的含义不同</strong>。epoll 是在连接打开、关闭、可读、可写的时候，收到通知；AIO 是在读写（通过 aio_read 或 aio_write 发起）完成之后（将要读的内容读到 application 指定的位置或将 application 指定的位置的内容写入成功）的通知。</li>
+<li><strong>通知的含义不同</strong>。Epoll 是在连接打开、关闭、可读、可写的时候，收到通知；AIO 是在读写（通过 aio_read 或 aio_write 发起）完成之后（将要读的内容读到 application 指定的位置或将 application 指定的位置的内容写入成功）的通知。</li>
 <li><strong>响应通知的 execution context 不同</strong>。epoll 是在调用线程中执行；而 aio 可以以 signal 、new thread 的方式来响应通知。</li>
-<li><strong>适用场景有所差异</strong>。epoll 主要用于网络和管道，不能操作文件；而 aio 几乎都可以。</li>
+<li><strong>适用场景有所差异</strong>。Epoll 主要用于网络和管道，不能操作文件；而 aio 几乎都可以。</li>
 </ul>
 <h2 id="5-参考资料"><a href="#5-参考资料" class="headerlink" title="5. 参考资料"></a>5. 参考资料</h2><p><a href="http://www.man7.org/linux/man-pages/man7/socket.7.html" target="_blank" rel="noopener">http://www.man7.org/linux/man-pages/man7/socket.7.html</a></p>
 <p><a href="http://www.man7.org/linux/man-pages/man7/epoll.7.html" target="_blank" rel="noopener">http://www.man7.org/linux/man-pages/man7/epoll.7.html</a></p>
@@ -260,7 +269,7 @@
     <span>目录</span>
   </div>
   <div class="table-content-main">
-    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-写在开头"><span class="toc-text">1. 写在开头</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-为什么写这个专题呢？"><span class="toc-text">2. 为什么写这个专题呢？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-这个专题会包含哪些内容呢？"><span class="toc-text">3. 这个专题会包含哪些内容呢？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-正篇"><span class="toc-text">4. 正篇</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-字面意思解释"><span class="toc-text">4.1. 字面意思解释</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-对应的编程技术"><span class="toc-text">4.2. 对应的编程技术</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#4-2-1-结论1"><span class="toc-text">4.2.1. 结论1</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-2-2-结论2"><span class="toc-text">4.2.2. 结论2</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-2-3-非阻塞与异步的“特殊”关系"><span class="toc-text">4.2.3. 非阻塞与异步的“特殊”关系</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-epoll和AIO的区别"><span class="toc-text">4.3. epoll和AIO的区别</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-参考资料"><span class="toc-text">5. 参考资料</span></a></li></ol>
+    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-写在开头"><span class="toc-text">1. 写在开头</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-为什么写这个专题呢？"><span class="toc-text">2. 为什么写这个专题呢？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-这个专题会包含哪些内容呢？"><span class="toc-text">3. 这个专题会包含哪些内容呢？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-正篇"><span class="toc-text">4. 正篇</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-字面意思解释"><span class="toc-text">4.1. 字面意思解释</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-对应的编程技术"><span class="toc-text">4.2. 对应的编程技术</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#4-2-1-结论1"><span class="toc-text">4.2.1. 结论1</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-2-2-结论2"><span class="toc-text">4.2.2. 结论2</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-2-3-非阻塞与异步的“特殊”关系"><span class="toc-text">4.2.3. 非阻塞与异步的“特殊”关系</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-Epoll和AIO的区别"><span class="toc-text">4.3. Epoll和AIO的区别</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-参考资料"><span class="toc-text">5. 参考资料</span></a></li></ol>
   </div>
 </aside>
   
