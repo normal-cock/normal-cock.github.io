@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+  
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  <meta name="author" content="Normal Cock">
+  
+  
+  <title>Http-And-Tcp——Http Server漫游(2) | Chicken Farm</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  
+    <meta name="keywords" content="Http Server漫游,HTTP,TCP,Keep-Alive,Asynchronous,Multiplexing,">
+  
+
+  
+  <meta name="description" content="通过手动代码实验，感受从HTTP/1.0到HTTP/2的演进过程中，剖析HTTP与TCP的“爱恨情仇”。">
+
+  
+
+  
+    <script src="//cdn.jsdelivr.net/npm/leancloud-storage@3.11.1/dist/av-min.js" async></script>
+  
+
+  
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+  
+
+  
+    <script src="//unpkg.com/valine/dist/Valine.min.js" async></script>
+  
+
+  
+
+  <script>
+  // theme-ad's config script
+  // it can be used in every script
+  
+  window.AD_CONFIG = {
+    leancloud: {"appid":"Hyq9wkH495DgNHWhDQCOfQSp-gzGzoHsz","appkey":"WaR7nrzhliHj9aVwdQzkdlGd","comment":true,"count":true},
+    welcome: {"enable":false,"interval":30},
+    start_time: "2019-07-13",
+    passwords: ["efe07af7441da2b69c4a41e42e73be4db47f66010a56900788a458354a7373ec", ],
+    is_post: true,
+    lock: false,
+    author: "Normal Cock",
+    share: {"twitter":true,"facebook":true,"weibo":true,"qq":true,"wechat":true},
+    mathjax: true,
+    page_type: "",
+    root: "/"
+  };
+</script>
+
+  <script src="/vendor/sha256.min.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/index.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
+
+  
+    <link rel="icon" href="/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/images/touch-icon.png">
+  
+
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/index.css">
+<link rel="stylesheet" href="/styles/components/highlight/highlight.css">
+
+  
+</head>
+  <body>
+    <header class="site-header">
+  <div class="site-header-brand">
+    
+      <span class="site-header-brand-title">
+        <a href="/">Chicken Farm</a>
+      </span>
+    
+    
+      <span class="site-header-brand-motto"> | 安静写些东西</span>
+    
+  </div>
+  <div class="site-header-right">
+    <nav class="site-header-navigation">
+      
+        <a href="/" target="_self">首页</a>
+      
+        <a href="/archives/" target="_self">归档</a>
+      
+        <a href="/tags/" target="_self">标签</a>
+      
+        <a href="/categories/" target="_self">分类</a>
+      
+        <a href="/friends/" target="_self">友链</a>
+      
+        <a href="/about/" target="_self">关于</a>
+      
+    </nav>
+    <div class="site-header-btn">
+      
+        <a href="https://github.com/normal-cock/" target="_blank" id="site-github">
+          <i class="fa fa-github-alt"></i>
+        </a>
+      
+      <a href="javascript:void(0);" id="site-search">
+        <i class="fa fa-search"></i>
+      </a>
+      <a href="javascript:void(0);" id="site-nav-btn">
+        <i class="fa fa-ellipsis-v"></i>
+      </a>
+    </div>
+  </div>
+</header>
+<nav class="table-content" id="site-nav">
+  <div class="table-content-title">
+    <span>导航</span>
+  </div>
+  <div class="table-content-main">
+    <ol class="toc">
+      
+        <li class="toc-item">
+          <a href="/" target="_self">
+            首页
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/archives/" target="_self">
+            归档
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/tags/" target="_self">
+            标签
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/categories/" target="_self">
+            分类
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/friends/" target="_self">
+            友链
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/about/" target="_self">
+            关于
+          </a>
+        </li>
+      
+    </ol>
+  </div>
+</nav>
+<div id="site-process"></div>
+    <main>
+      
+  <div class="passage">
+  <div class="passage-meta">
+    <span>
+      <i class="fa fa-calendar"></i>2019-12-29
+    </span>
+    
+      <span>
+        | <a href="/categories/Http-Server漫游/"><i class="fa fa-bookmark"></i>Http Server漫游</a>
+      </span>
+    
+    
+      <span>
+        | <i class="fa fa-unlock-alt"></i>UNLOCK
+      </span>
+    
+  </div>
+  <h1 class="passage-title">
+    Http-And-Tcp——Http Server漫游(2)
+  </h1>
+  
+  <article class="passage-article">
+    <h2 id="1-写在开头"><a href="#1-写在开头" class="headerlink" title="1. 写在开头"></a>1. 写在开头</h2><p>上回我们介绍了<a href="https://zhuanlan.zhihu.com/p/88728018" target="_blank" rel="noopener">阻塞\非阻塞与同步\异步</a>的区别和联系。</p>
+<p>本次我们将通过自己动手写代码，做实验，感受从HTTP/1.0，到HTTP/1.1，再到HTTP/2的演进过程中，HTTP与TCP的爱恨情仇（既然是HTTP漫游系列，不说HTTP就有点过分了）。</p>
+<p>有同学可能会问，HTTP/3都快出来了，为什么你只说到HTTP/2呢？因为从HTTP/3开始，HTTP已经正式跟TCP分手，跟UDP组了CP，以后会找个机会跟大家分享一下TCP如何被UDP挖了墙角的。</p>
+<h2 id="2-先说结论"><a href="#2-先说结论" class="headerlink" title="2. 先说结论"></a>2. 先说结论</h2><ol>
+<li><strong>结论1</strong>：从HTTP/1.0到HTTP/2，都是利用TCP作为底层协议进行通信的。</li>
+<li><strong>结论2</strong>：HTTP/1.1，引进了长连接(keep-alive)，减少了建立和关闭连接的消耗和延迟。</li>
+<li><strong>结论3</strong>：HTTP/2，引入了多路复用：连接共享，提高了连接的利用率。</li>
+</ol>
+<p><strong>结论1</strong>不用解释，也不是我们今天的重点。<br>至于<strong>结论2</strong>和<strong>结论3</strong>中分别提到的<strong>长连接</strong>和<strong>多路复用</strong>，如果你跟我一样第一眼看到之后一脸懵逼，隐约明白什么意思，但仔细一想越想越糊涂感觉两者之间并没有区别的话，那么恭喜你，这篇文章就是为你而生。本次分享的目的就是为了帮助有缘人通过自己动手来理解这些晦涩的文字，即讲清楚<strong>长连接</strong>和<strong>多路复用</strong>的区别。</p>
+<h2 id="3-长连接和多路复用"><a href="#3-长连接和多路复用" class="headerlink" title="3. 长连接和多路复用"></a>3. 长连接和多路复用</h2><p>还是先用白话文说一下结论：</p>
+<ul>
+<li>长连接是连接层面的优化，但<strong><em>同一个HTTP/1.1连接只能串行处理请求</em></strong>。</li>
+<li>多路复用是协议层面的优化，能够让<strong><em>多个请求可以共用同一个HTTP/2连接且互不影响</em></strong>。</li>
+</ul>
+<p>举个例子。HTTP/1.1的时候，假如A请求正在占用连接C（即client发送了request，但还没有收到response），此时B请求只能等待A请求结束之后才能再次利用连接C来处理自己。那有没有更快的方法？有！就是当一个请求占用了一个连接时，建立一个新的连接来处理请求B。</p>
+<p>而有了多路复用，即使A请求正在占用着连接C，B请求依然可以利用连接C，同时丝毫不受请求A是否完成的影响。</p>
+<h2 id="4-实验思路"><a href="#4-实验思路" class="headerlink" title="4. 实验思路"></a>4. 实验思路</h2><p>好，结论有了，我们就来看看如何通过实验来验证我们的结论。</p>
+<p>我们的实验思路是：通过连续向<strong>同一个连接</strong>向服务端发送了两个sleep(5s)的请求，并观察HTTP/1.1和HTTP/2的服务器处理这两个请求分别需要多长时间，也就是client收到response分别需要多久。</p>
+<p>按照我们的结论，对于HTTP/1.1的服务器，两个请求需要10s来完成；对于HTTP/2的服务器，两个请求只需要5s来完成。</p>
+<h2 id="5-开始试验"><a href="#5-开始试验" class="headerlink" title="5. 开始试验"></a>5. 开始试验</h2><h3 id="5-1-实验需要准备的东西"><a href="#5-1-实验需要准备的东西" class="headerlink" title="5.1. 实验需要准备的东西"></a>5.1. 实验需要准备的东西</h3><ul>
+<li>python3</li>
+<li>nc(netcat)。用于发起HTTP/1.1请求</li>
+<li><a href="https://github.com/python-hyper/hyper" target="_blank" rel="noopener">hyper</a>。用于发起HTTP/2请求。</li>
+<li><a href="https://github.com/benoitc/gunicorn" target="_blank" rel="noopener">gunicorn</a>。用与搭建HTTP/1.1 Server。</li>
+<li><a href="https://github.com/python-hyper/hyper-h2" target="_blank" rel="noopener">h2</a>。用于搭建HTTP/2 Server。</li>
+</ul>
+<h3 id="5-2-注意点"><a href="#5-2-注意点" class="headerlink" title="5.2. 注意点"></a>5.2. 注意点</h3><ol>
+<li>gunicorn默认的Sync worker_class没有支持keep-alive（长连接，即我们要测试的HTTP/1.1特性），需要使用其他的worker_class，例如eventlet。</li>
+<li>为什么用nc而不用requests库？通过阅读requests和urllib3代码发现，一个connection在使用时会pop，导致无法再访问到该connection。所以无法使用requests和urllib3模拟多个请求争抢同一个连接的情况。</li>
+<li>linux下使用nc有个坑，http协议使用的\r\n的换行，而linux下按下回车键只输入\n。所以需要使用<code>nc -C</code>（大写的C）命令将回车变成\r\n。</li>
+</ol>
+<h3 id="5-3-服务端的部署"><a href="#5-3-服务端的部署" class="headerlink" title="5.3. 服务端的部署"></a>5.3. 服务端的部署</h3><p>不管是启动HTTP/1.1 Server还是HTTP/2 Server，都可以使用wsgi协议，所以代码是同一套。如下所示：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># app.py</span></span><br><span class="line"><span class="keyword">import</span> time</span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">app</span><span class="params">(environ, start_response)</span>:</span></span><br><span class="line">    <span class="string">"""Simplest possible application object"""</span></span><br><span class="line">    data = <span class="string">b'Hello, World!\n'</span></span><br><span class="line">    status = <span class="string">'200 OK'</span></span><br><span class="line">    response_headers = [</span><br><span class="line">        (<span class="string">'Content-type'</span>, <span class="string">'text/plain'</span>),</span><br><span class="line">        (<span class="string">'Content-Length'</span>, str(len(data)))</span><br><span class="line">    ]</span><br><span class="line">    time.sleep(<span class="number">5</span>)</span><br><span class="line">    start_response(status, response_headers)</span><br><span class="line">    <span class="keyword">return</span> iter([data])</span><br></pre></td></tr></table></figure>
+<h4 id="5-3-1-启动HTTP-1-1-Server"><a href="#5-3-1-启动HTTP-1-1-Server" class="headerlink" title="5.3.1. 启动HTTP/1.1 Server"></a>5.3.1. 启动HTTP/1.1 Server</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gunicorn app:app --keep-alive 10 -b 0.0.0.0:8010 -w 2 --log-level DEBUG -k eventlet</span><br></pre></td></tr></table></figure>
+<p>关键参数解释:</p>
+<ul>
+<li><code>app:app</code>。前一个<code>app</code>代表的是文件名，即<code>app.py</code>；后一个<code>app</code>代表的是函数名。</li>
+<li><code>--keep-alive 10</code>。代表开启HTTP/1.1的Keep Alive功能，且连接的保持时间为10s。</li>
+<li><code>-k eventlet</code>。代表使用<code>eventlet</code>作为<code>work_class</code>，这个上面已经解释过，默认的<code>work_class</code>不支持Keep Alive。</li>
+<li><code>-w 2</code>。代表说明worker数量对HTTP/1.1的表现并没有影响。</li>
+</ul>
+<h4 id="5-3-2-启动HTTP-2-Server"><a href="#5-3-2-启动HTTP-2-Server" class="headerlink" title="5.3.2. 启动HTTP/2 Server"></a>5.3.2. 启动HTTP/2 Server</h4><p>目前没有现成的可以直接启动HTTP/2 Server的python包，<code>h2</code>仅仅是提供了解析HTTP/2协议的能力。但是<code>h2</code>的文档上有提供启动HTTP/2 Server的<a href="https://python-hyper.org/projects/h2/en/stable/wsgi-example.html" target="_blank" rel="noopener">实例代码</a>，虽然用于生产环境还有很多工作要做，但是用于我们的实验是妥妥的足够了。</p>
+<p>启动步骤为：</p>
+<ol>
+<li>将实例代码保存到名为<code>asyncio-server.py</code>的文件中，并且与<code>app.py</code>放在同一个文件夹下。</li>
+<li><code>python asyncio-server.py app:app</code>。注意，端口默认为<code>8443</code>，可以通过修改<code>asyncio-server.py</code>中的代码来修改端口。</li>
+</ol>
+<p>总的来说还是挺方便的。</p>
+<h3 id="5-4-发起请求观察实验结果"><a href="#5-4-发起请求观察实验结果" class="headerlink" title="5.4. 发起请求观察实验结果"></a>5.4. 发起请求观察实验结果</h3><h4 id="5-4-1-HTTP-1-1"><a href="#5-4-1-HTTP-1-1" class="headerlink" title="5.4.1. HTTP/1.1"></a>5.4.1. HTTP/1.1</h4><h5 id="5-4-1-1-发起请求"><a href="#5-4-1-1-发起请求" class="headerlink" title="5.4.1.1. 发起请求"></a>5.4.1.1. 发起请求</h5><p>我们知道，nc会建立一个tcp连接。所以下面的命令是借用一个tcp连接来发送两次http请求</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">echo -e "GET / HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\n\r\n"|nc 127.0.0.1 8010</span><br></pre></td></tr></table></figure>
+<h5 id="5-4-1-2-实验结果"><a href="#5-4-1-2-实验结果" class="headerlink" title="5.4.1.2. 实验结果"></a>5.4.1.2. 实验结果</h5><p>HTTP/1.1的请求结果如下，可以看到，第一次请求结束5s只有，第二次请求才结束。也就是说两次请求总共花了10s的时间，验证了<strong>同一个HTTP/1.1连接只能串行处理请求</strong>的结论。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">HTTP/1.1 200 OK</span><br><span class="line">Server: gunicorn/19.9.0</span><br><span class="line">Date: Sun, 05 Jan 2020 05:40:34 GMT</span><br><span class="line">Connection: keep-alive</span><br><span class="line">Content-type: text/plain</span><br><span class="line">Content-Length: 14</span><br><span class="line"></span><br><span class="line">Hello, World!</span><br><span class="line">HTTP/1.1 200 OK</span><br><span class="line">Server: gunicorn/19.9.0</span><br><span class="line">Date: Sun, 05 Jan 2020 05:40:39 GMT</span><br><span class="line">Connection: keep-alive</span><br><span class="line">Content-type: text/plain</span><br><span class="line">Content-Length: 14</span><br><span class="line"></span><br><span class="line">Hello, World!</span><br></pre></td></tr></table></figure>
+<h4 id="5-4-2-HTTP-2"><a href="#5-4-2-HTTP-2" class="headerlink" title="5.4.2. HTTP/2"></a>5.4.2. HTTP/2</h4><h5 id="5-4-2-1-发起请求"><a href="#5-4-2-1-发起请求" class="headerlink" title="5.4.2.1. 发起请求"></a>5.4.2.1. 发起请求</h5><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> hyper</span><br><span class="line"><span class="keyword">import</span> time</span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">test</span><span class="params">()</span>:</span></span><br><span class="line">    begin_time = time.time()</span><br><span class="line">    conn = hyper.HTTP20Connection(<span class="string">'localhost:8443'</span>)</span><br><span class="line">    <span class="comment"># 发送两次请求</span></span><br><span class="line">    first_stream_id = conn.request(<span class="string">'GET'</span>, <span class="string">'/get'</span>)</span><br><span class="line">    second_stream_id = conn.request(<span class="string">'GET'</span>, <span class="string">'/get'</span>)</span><br><span class="line"></span><br><span class="line">    first_resp = conn.get_response(first_stream_id)</span><br><span class="line">    second_resp = conn.get_response(second_stream_id)</span><br><span class="line">    print((<span class="string">'two request cost %.2fs'</span> % (time.time()-begin_time)))</span><br><span class="line">    print(first_resp.read())</span><br><span class="line">    print(second_resp.read())</span><br><span class="line"></span><br><span class="line">test()</span><br></pre></td></tr></table></figure>
+<h5 id="5-4-2-2-实验结果"><a href="#5-4-2-2-实验结果" class="headerlink" title="5.4.2.2. 实验结果"></a>5.4.2.2. 实验结果</h5><p>请求结果如下，可以看到，通过同一个连接处理两次请求，总共花了5s。验证了我们的结论：<strong>多个请求可以共用同一个HTTP/2连接且互不影响</strong>。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">two request cost 5.05s</span><br><span class="line">b'Hello, World!\n'</span><br><span class="line">b'Hello, World!\n'</span><br></pre></td></tr></table></figure>
+<h2 id="6-参考资料"><a href="#6-参考资料" class="headerlink" title="6. 参考资料"></a>6. 参考资料</h2><ul>
+<li><a href="https://en.wikipedia.org/wiki/HTTP/2" target="_blank" rel="noopener">https://en.wikipedia.org/wiki/HTTP/2</a></li>
+</ul>
+  </article>
+  <aside class="table-content" id="site-toc">
+  <div class="table-content-title">
+    <i class="fa fa-arrow-right fa-lg" id="site-toc-hide-btn"></i>
+    <span>目录</span>
+  </div>
+  <div class="table-content-main">
+    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-写在开头"><span class="toc-text">1. 写在开头</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-先说结论"><span class="toc-text">2. 先说结论</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-长连接和多路复用"><span class="toc-text">3. 长连接和多路复用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-实验思路"><span class="toc-text">4. 实验思路</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-开始试验"><span class="toc-text">5. 开始试验</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-实验需要准备的东西"><span class="toc-text">5.1. 实验需要准备的东西</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-注意点"><span class="toc-text">5.2. 注意点</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-服务端的部署"><span class="toc-text">5.3. 服务端的部署</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#5-3-1-启动HTTP-1-1-Server"><span class="toc-text">5.3.1. 启动HTTP/1.1 Server</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-3-2-启动HTTP-2-Server"><span class="toc-text">5.3.2. 启动HTTP/2 Server</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-4-发起请求观察实验结果"><span class="toc-text">5.4. 发起请求观察实验结果</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#5-4-1-HTTP-1-1"><span class="toc-text">5.4.1. HTTP/1.1</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#5-4-1-1-发起请求"><span class="toc-text">5.4.1.1. 发起请求</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#5-4-1-2-实验结果"><span class="toc-text">5.4.1.2. 实验结果</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-4-2-HTTP-2"><span class="toc-text">5.4.2. HTTP/2</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#5-4-2-1-发起请求"><span class="toc-text">5.4.2.1. 发起请求</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#5-4-2-2-实验结果"><span class="toc-text">5.4.2.2. 实验结果</span></a></li></ol></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-参考资料"><span class="toc-text">6. 参考资料</span></a></li></ol>
+  </div>
+</aside>
+  
+    <aside class="passage-copyright">
+      <div>本文作者: Normal Cock</div>
+      
+        <div>
+          原文链接: 
+          <a href target="_blank">https://normal-cock.github.io/passages/Http-And-Tcp——Roaming-Http-Server-2/</a>
+        </div>
+      
+      <div>
+        版权声明: 本博客所有文章除特别声明外, 均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议. 转载请注明出处!
+      </div>
+    </aside>
+  
+  
+    <div class="passage-tags">
+     
+      <a href="/tags/HTTP/"><i class="fa fa-tags"></i>HTTP</a>
+     
+      <a href="/tags/TCP/"><i class="fa fa-tags"></i>TCP</a>
+     
+      <a href="/tags/Keep-Alive/"><i class="fa fa-tags"></i>Keep-Alive</a>
+     
+      <a href="/tags/Asynchronous/"><i class="fa fa-tags"></i>Asynchronous</a>
+     
+      <a href="/tags/Multiplexing/"><i class="fa fa-tags"></i>Multiplexing</a>
+    
+    </div>
+  
+</div>
+
+    </main>
+    
+      
+<div class="site-comment-contanier" data-plateform="leancloud">
+  
+    <p id="site-comment-info">
+      <i class="fa fa-spinner fa-spin"></i> 评论加载中
+    </p>
+    <div id="site-comment"></div>
+  
+</div>
+    
+    <div class="site-footer-wrapper">
+  <footer class="site-footer">
+    
+      
+        <div class="site-footer-col">
+          <h5 class="site-footer-title">博客推荐</h5>
+          
+            <span class="site-footer-item">
+              <a href="https://godbmw.com/" target="_blank">GodBMW</a>
+            </span>
+          
+            <span class="site-footer-item">
+              <a href="http://ruanyifeng.com/" target="_blank">Zhi的个人网站</a>
+            </span>
+          
+        </div>
+      
+        <div class="site-footer-col">
+          <h5 class="site-footer-title">抓到我</h5>
+          
+            <span class="site-footer-item">
+              <a href="https://juejin.im/user/5b91fcf06fb9a05d3c7fd4a5" target="_blank">掘金</a>
+            </span>
+          
+            <span class="site-footer-item">
+              <a href="https://segmentfault.com/" target="_blank">思否</a>
+            </span>
+          
+        </div>
+      
+    
+    <div class="site-footer-info">
+      <i class="fa fa-clock-o"></i> 本站已稳定运行<span id="site-time"></span>
+    </div>
+    
+      <div class="site-footer-info">
+        <i class="fa fa-paw"></i> 您是本站第 <span id="site-count"></span> 位访客
+      </div>
+    
+    
+      <div class="site-footer-info">
+        <i class="fa fa-at"></i> Email: daedae11@126.com
+      </div>
+    
+    <div class="site-footer-info">
+      <i class="fa fa-copyright"></i> 
+      2019 <a href="https://github.com/dongyuanxin/theme-ad/" target="_blank">Theme-AD</a>.
+      Created by <a href="https://godbmw.com/" target="_blank">GodBMW</a>.
+      All rights reserved.
+    </div>
+  </footer>
+</div>
+    <div id="site-layer" style="display:none;">
+  <div class="site-layer-content">
+    <div class="site-layer-header">
+      <span class="site-layer-header-title" id="site-layer-title"></span>
+      <i class="fa fa-close" id="site-layer-close"></i>
+    </div>
+    <div class="site-layer-body" id="site-layer-container">
+      <div class="site-layer-input" id="site-layer-search" style="display: none;">
+        <div class="site-layer-input-choose">
+          <a href="javascript:void(0);" title="Change Search Engine">Google</a>
+        </div>
+        <input type="text">
+        <i class="fa fa-search"></i>
+      </div>
+      
+        <div class="site-layer-reward" id="site-layer-reward" style="display: none;">
+          
+            <div>
+              <img src="/images/wechat.png" alt="WeChat">
+              
+                <p>WeChat</p>
+              
+            </div>
+          
+            <div>
+              <img src="/images/alipay.png" alt="AliPay">
+              
+                <p>AliPay</p>
+              
+            </div>
+          
+        </div>
+      
+      <div id="site-layer-welcome" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+    
+
+<div class="bottom-bar">
+  <div class="bottom-bar-left">
+    <a href="javascript:void(0);" data-enable="false">
+      <i class="fa fa-arrow-left"></i>
+    </a>
+    <a href="/passages/Block-Non-block-Synchronous-Asynchronous——Roaming-Http-Server-1/" data-enable="true">
+      <i class="fa fa-arrow-right"></i>
+    </a>
+  </div>
+  <div class="bottom-bar-right">
+    <a href="javascript:void(0);" data-enable="true" id="site-toc-show-btn">
+      <i class="fa fa-bars"></i>
+    </a>
+    
+      <a href="#site-comment" data-enable="true">
+        <i class="fa fa-commenting"></i>
+      </a>
+    
+    <a href="javascript:void(0);" id="site-toggle-share-btn">
+      <i class="fa fa-share-alt"></i>
+    </a>
+    
+      <a href="javascript:void(0);" id="site-reward">
+        <i class="fa fa-thumbs-up"></i>
+      </a>
+    
+    <a href="javascript:void(0);" id="back-top-btn">
+      <i class="fa fa-chevron-up"></i>
+    </a>
+  </div>
+</div>
+    <div id="share-btn">
+  
+    <a id="share-btn-twitter" href="javascript:void(0);" target="_blank">
+      <i class="fa fa-twitter"></i>
+    </a>
+  
+  
+    <a id="share-btn-facebook" href="javascript:void(0);" target="_blank">
+      <i class="fa fa-facebook"></i>
+    </a>
+  
+  
+    <a id="share-btn-weibo" href="javascript:void(0);" target="_blank">
+      <i class="fa fa-weibo"></i>
+    </a>
+  
+  
+    <a id="share-btn-qq" href="javascript:void(0);" target="_blank">
+      <i class="fa fa-qq"></i>
+    </a>
+  
+  
+    <a id="share-btn-wechat" href="javascript:void(0);" target="_blank">
+      <i class="fa fa-wechat"></i>
+    </a>
+  
+</div>
+    
+
+
+
+
+
+    
+  </body>
+</html>
